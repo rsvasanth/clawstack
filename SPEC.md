@@ -215,7 +215,164 @@ Every workspace/user role grants subsets.
 
 ---
 
-## 12. Source Project References
+## 12. Breakthrough Memory Architecture
+
+> From swarm design session — memory expert + ml expert contributions.
+
+### 12.1 Causal Provenance Graph
+
+Every memory node carries a full causal chain back to its source. The system maintains an explicit DAG (directed acyclic graph) of memory provenance. Forgetting is a first-class causal operation — not deletion, but a recorded reason for removal.
+
+**The breakthrough:** "Why do you know this?" returns an actual evidentiary chain, not proximity similarity.
+
+```rust
+pub struct MemoryNode {
+    id: Uuid,
+    embedding: Vec<f32>,
+    text: String,
+    node_type: NodeType,
+    provenance: Vec<ProvenanceLink>,  // causal chain backward
+    confidence: f32,                  // 0.0-1.0 evidence strength
+    is_active: bool,                 // false = soft-deleted with reason
+}
+
+pub enum NodeType {
+    UserInput(String),              // raw user utterance
+    ToolOutput { tool: String },    // from tool execution
+    Derived { rule: String },      // derived from similarity
+    Synthesized { skill_ref: Uuid },
+}
+
+pub enum ForgetReason {
+    Contradicted { newer_id: Uuid },
+    Superseded { replacement_id: Uuid },
+    DecayedBelowThreshold { score: f32 },
+    UserRequested,
+    DriftDetected { old: Vec<f32>, new: Vec<f32>, delta: f32 },
+}
+```
+
+**Postgres schema:**
+- `memory_nodes` — DAG nodes with provenance edges
+- `provenance_edges` — causal links (supporting, refuting, derivation_step)
+- `forget_log` — immutable record of why something was discarded
+
+**Key algorithms:**
+- `trace_provenance(memory_id, depth)` — BFS backward chain, returns evidentiary roots
+- `find_contradictions(new_embedding)` — pgvector cosine distance check before write; if refutes existing, insert refuting edge instead of overwriting
+- `detect_semantic_drift(cluster_id)` — if same "fact" drifts semantically over time, flag and preserve both versions
+
+### 12.2 Attractor-Based Memory Dynamics
+
+Memory space modeled as a **dynamic attractor landscape**, not flat vector store. Each concept/skill occupies an attractor basin. The system continuously learns which memories lead to success and adjusts basin boundaries accordingly.
+
+**The breakthrough:** Not passive retrieval. Active learning about what leads to desired outcomes.
+
+```rust
+pub struct AttractorState {
+    memory_id: Uuid,
+    activation_level: f32,    // EWMA of recent access × similarity
+    success_signal: f32,      // EWMA of success outcomes
+    failure_signal: f32,      // EWMA of failure outcomes
+    attractor_strength: f32,  // how focused vs diffuse
+}
+
+pub struct QueryActivation {
+    activated_attractors: Vec<(Uuid, f32)>,
+    suppressed_attractors: Vec<Uuid>,
+    novel_region: bool,
+}
+```
+
+**Key algorithms:**
+- `activate(memory_id, query_embedding)` — on every access, update activation + success/failure EWMA
+- `decay_all()` — timer-based decay of activation levels
+- `recompute_landscape()` — periodic full recompute of centroids, basin boundaries, repulsion pairs
+- `query(embedding)` — activates basins, returns ranked memories weighted by activation × success_signal
+
+### 12.3 Memory That Can Explain Itself
+
+For any memory:
+- "Why do you know this?" → full causal chain to user inputs
+- "How sure are you?" → joint confidence from all provenance links
+- "What contradicts this?" → traversal of refuting edges
+- "Has this changed over time?" → semantic drift detection
+
+### 12.4 Implicit Forgetting
+
+Forgetting is NOT deletion. Every removal is a `ForgetRecord` with a reason. Old memory is preserved in the causal chain — you can reconstruct what the agent believed before the correction.
+
+---
+
+## 13. Breakthrough Learning Architecture
+
+> From swarm design session — ml expert contributions.
+
+### 13.1 Skill Lifecycle with Effectiveness Tracking
+
+Skills are living artifacts, not static files:
+
+```rust
+pub struct Skill {
+    // ... existing fields ...
+    effectiveness: EffectivenessMetrics,
+    lineage: Vec<SkillId>,      // parent skills this evolved from
+    principles: Vec<PrincipleId>,
+}
+
+pub struct EffectivenessMetrics {
+    use_count: u64,
+    success_count: u64,
+    failure_count: u64,
+    avg_duration_ms: u64,
+    last_used: DateTime<Utc>,
+    last_refined: DateTime<Utc>,
+}
+```
+
+On every skill execution: update counters → if failure_rate > 20%, trigger SkillRefiner.
+
+### 13.2 Principle Extraction (Not Just Patterns)
+
+Patterns overfit. Principles generalize. The learning service extracts **principles** from clusters of successful trajectories:
+
+```
+Input: 5 successful repo fix trajectories
+Output: "When fixing test failures in a PR, first run the failing test in isolation
+         to confirm the failure mode, then check git blame on that specific line
+         before assuming the change that introduced the failure."
+```
+
+Every synthesized skill is annotated with the principles that guided it → skills become explainable.
+
+### 13.3 FTS5 Session Search
+
+Session history indexed with full-text search + structured metadata.
+
+### 13.4 Memory Nudge System
+
+Periodic proactive memory management triggered by:
+- Every N turns (e.g., 50)
+- Significant decisions detected in conversation
+- On session end
+- Weekly scheduled review
+
+### 13.5 User Preference Model
+
+Learned model of user preferences, updated continuously:
+
+```rust
+pub struct UserPreferenceModel {
+    communication: CommunicationPrefs,
+    technical: TechnicalPrefs,
+    privacy: PrivacyPrefs,
+    patterns: PatternPrefs,
+}
+```
+
+---
+
+## 14. Source Project References
 
 | Project | Path | Role |
 |---------|------|------|
