@@ -1,5 +1,5 @@
 [package]
-name = "clawstack-memory"
+name = "clawstack-toolbus"
 version.workspace = true
 edition.workspace = true
 
@@ -7,13 +7,12 @@ edition.workspace = true
 clawstack-common.workspace = true
 clawstack-kernel.workspace = true
 
-# Database
-sqlx.workspace = true
-pgvector.workspace = true
-
 # Async
 tokio.workspace = true
 async-trait.workspace = true
+
+# HTTP client for web.fetch
+reqwest.workspace = true
 
 # Serialization
 serde.workspace = true
@@ -25,5 +24,4 @@ anyhow.workspace = true
 
 # Utils
 tracing.workspace = true
-uuid.workspace = true
-chrono.workspace = true
+url.workspace = true

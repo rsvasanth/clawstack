@@ -6,6 +6,7 @@ members = [
   "crates/clawstack-common",
   "crates/clawstack-gateway",
   "crates/clawstack-kernel",
+  "crates/clawstack-llm",
   "crates/clawstack-memory",
   "crates/clawstack-policy",
   "crates/clawstack-scheduler",

@@ -3,6 +3,8 @@ SkillSynthesizer — promotes successful trajectories into reusable skills.
 """
 
 import uuid
+import os
+import httpx
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
@@ -111,6 +113,7 @@ class SkillSynthesizer:
     def __init__(self, collector, rust_grpc_addr: str):
         self.collector = collector
         self.rust_grpc_addr = rust_grpc_addr
+        self.http_client = httpx.AsyncClient(timeout=30.0)
 
     async def synthesize_from_pattern(
         self,
@@ -181,13 +184,16 @@ class SkillSynthesizer:
                 caps.add("shell.exec")
         return list(caps)
 
-    async def run_cycle(self) -> list[SkillDraft]:
+    async def run_cycle(self, workspace_id: uuid.UUID) -> list[SkillDraft]:
         """
         Full synthesis cycle: fetch patterns, generate drafts, send to Rust.
         Called periodically by the scheduler.
+        
+        Args:
+            workspace_id: The workspace to analyze trajectories for.
         """
-        # Step 1: Fetch recent trajectories from collector
-        trajectories = await self.collector.fetch_recent(uuid.uuid4(), limit=500)
+        # Step 1: Fetch recent trajectories from collector for this workspace
+        trajectories = await self.collector.fetch_recent(workspace_id, limit=500)
         if not trajectories:
             return []
 
@@ -201,9 +207,30 @@ class SkillSynthesizer:
             if draft:
                 drafts.append(draft)
 
-        # Step 4: Send drafts to Rust for approval
-        # TODO: gRPC call to Rust to submit SkillDraft
-        for draft in drafts:
-            print(f"[SkillSynthesizer] Proposed draft: {draft.skill.name}")
+        # Step 4: Send drafts to Rust for approval via REST API
+        await self._submit_drafts_to_rust(drafts)
 
         return drafts
+
+    async def _submit_drafts_to_rust(self, drafts: list[SkillDraft]) -> None:
+        """
+        Submit skill drafts to Rust gateway for approval.
+        Uses REST API as fallback when gRPC is not available.
+        """
+        rust_url = os.environ.get("RUST_GATEWAY_URL", "http://localhost:8080")
+        
+        for draft in drafts:
+            try:
+                # Try REST API first
+                response = await self.http_client.post(
+                    f"{rust_url}/api/v1/skills/drafts",
+                    json=draft.to_dict(),
+                )
+                if response.status_code == 201:
+                    print(f"[SkillSynthesizer] Submitted draft: {draft.skill.name}")
+                else:
+                    print(f"[SkillSynthesizer] Failed to submit draft: {response.status_code}")
+            except Exception as e:
+                # gRPC would be used here in production
+                print(f"[SkillSynthesizer] Could not reach Rust gateway: {e}")
+                print(f"[SkillSynthesizer] Draft pending: {draft.skill.name}")
