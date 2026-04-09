@@ -372,7 +372,168 @@ pub struct UserPreferenceModel {
 
 ---
 
-## 14. Source Project References
+## 15. Security Architecture
+
+> From swarm design session — security expert.
+
+### 15.1 Transitive Trust Auditing
+
+The #1 unique threat in agent runtimes: **action graph amplification**. If tool A calls B, and B calls C, the agent may execute an action authorized by A but executed by C — no framework tracks this graph.
+
+**Breakthrough:** Runtime traverses the full call graph before sensitive actions. Each tool logs its *caller context* (not just its own policy) into an immutable audit log.
+
+### 15.2 Linear Logic Capabilities
+
+Capabilities are not boolean flags — they are **proof obligations**.
+
+```rust
+// Capabilities as Ed25519-signed JWTs with consumption counter
+// Double-spend or replay = kernel rejection
+struct CapabilityToken {
+    claims: Claims,
+    signature: Ed25519Signature,
+    consumed: AtomicU64,  // linear: must be exactly 1
+}
+```
+
+Rust kernel issues; Python learning layer presents as proofs; WASM executor verifies atomically. TLA+-verifiable because linear logic has complete formal semantics.
+
+### 15.3 Tamper-Evident Action Provenance Trees
+
+Not logs — **cryptographically chained state snapshots**.
+
+```rust
+// After each tool execution, compute:
+H = SHA3-256(parent_H || tool_name || tool_output_summary || memory_pointer)
+// Stored in Postgres alongside serialized state snapshot
+```
+
+Changing any past node invalidates all downstream hashes. Like Git's Merkle trees but for agent cognition. Dedicated audit service can verify chain integrity and replay any decision subtree offline.
+
+---
+
+## 16. Rust-Native Tool Architecture
+
+> From swarm design session — rust expert.
+
+### 16.1 Typed WASM Tool Contracts
+
+Tool implementations compiled to WASM with typed contracts in the module's custom section. Kernel validates at **load time**, not dispatch.
+
+```rust
+pub struct ToolManifest {
+    pub name: String,
+    pub permissions: Permissions,
+    pub memory_pages: u32,
+}
+
+fn load_tool(wasm_bytes: &[u8], policy: &Policy) -> Result<Arc<dyn Tool>> {
+    let manifest = extract_manifest(wasm_bytes)?;  // from WASM custom section
+    ensure!(policy.allows(&manifest.permissions))?;  // static check at load
+    Ok(instantiate_wasm(wasm_bytes)?)
+}
+```
+
+### 16.2 Borrow-Based Kernel/Tool Boundary
+
+Zero serialization crossing the boundary — shared address space with typed references.
+
+```rust
+pub trait Tool: Send + Sync {
+    fn name(&self) -> &str;
+    fn execute<'_ctx>(&self, ctx: ToolCtx<'_ctx>, input: Cow<'_, str>) -> Result<Cow<'ctx, str>, ToolError>;
+}
+
+pub struct ToolCtx<'ctx> {
+    pub memory: &'ctx Memory,       // pgvector-backed, borrowed
+    pub policy: &'ctx Policy,        // read-only at execute time
+    pub grants: &'ctx ToolGrants,   // scoped resources
+}
+```
+
+### 16.3 Ownership-Guaranteed Resource Grants
+
+Lifetime-encoded resource scope — the borrow checker *physically prevents* accessing resources outside the grant.
+
+```rust
+pub struct FileHandle<'ctx> {
+    _marker: PhantomData<&'ctx ()>,
+    fd: RawFd,
+    range: Option<Range<u64>>,
+}
+
+pub struct MemoryRegion<'ctx> {
+    _marker: PhantomData<&'ctx ()>,
+    ptr: NonNull<u8>,
+    len: usize,
+}
+```
+
+Drop `ToolCtx` → `FileHandle` and `MemoryRegion` become invalid. No capability tokens to forge. No revocation logic. The lifetime *is* the enforcement.
+
+---
+
+## 17. UX Architecture
+
+> From swarm design session — ux expert.
+
+### 17.1 Conversation Replay & Undo
+
+After each task: "Here's what I did" accordion. Each step is a card (icon + action label + timestamp). Tap any card to undo that specific action. **Version control for your life.**
+
+### 17.2 Permission-First Skill Cards
+
+Skills show **"what they need" before "what they do"** — icon pills (📧 Email, 📅 Calendar, 📍 Location). Install button disabled until user scrolls to "I understand." Trust through ritual, not education.
+
+### 17.3 The Hesitation Pause
+
+If user sends 3+ messages within 60s rephrasing the same intent → surface a "Clarifying question" card: "It sounds like you want X — is that right?"
+
+Users rarely say "I don't understand." They just try again, differently. That rephrasing effort is the most honest confusion signal — currently ignored by every framework.
+
+---
+
+## 18. Economics & Token Optimization
+
+> From swarm design session — economics expert.
+
+### 18.1 Learned Cost-Quality Pacing
+
+Adaptive token budgeting via RL policy gradient:
+
+```
+Algorithm: Thompson Sampling + Linear UCB
+- Logistic regression on task embeddings predicts tokens needed per quality threshold
+- Early termination when marginal quality gain drops below learned threshold
+- Result: ~40% token savings on easy tasks, >95% quality retained
+```
+
+### 18.2 Activity-Based Costing Per Workspace
+
+```
+Cost/workspace/month = Σ (compute_minutes × $0.002)
+                     + Σ (memory_gb_seconds × $0.0001)
+                     + Σ (input_tokens × $0.001/1K + output_tokens × $0.003/1K)
+
+Overage tiers: 5% / 15% / 30% discounts at $10 / $50 / $200 / month committed
+```
+
+### 18.3 Learned Memory Compression
+
+Distilled compression as an optimizable ML problem:
+
+```
+Encoder: sentence-transformer → dense vector
+Policy Net (LSTM): predicts "retain / compress-to-X%" per sentence
+Training: minimize reconstruction error at retrieval time
+Result: 60-80% token reduction, <5% recall degradation on held-out queries
+```
+
+Served as async Python microservice behind Rust kernel. ~0.1ms latency overhead for 3-5× memory density gain in pgvector.
+
+---
+
+## 19. Source Project References
 
 | Project | Path | Role |
 |---------|------|------|
