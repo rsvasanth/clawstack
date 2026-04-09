@@ -1,0 +1,6 @@
+apiVersion: v2
+name: clawstack
+version: 0.1.0
+appVersion: "0.1.0"
+description: "ClawStack — Secure, self-improving, multi-channel agent runtime"
+type: application

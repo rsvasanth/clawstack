@@ -1,0 +1,93 @@
+[workspace]
+resolver = "2"
+version = "0.1.0"
+
+members = [
+  "crates/clawstack-common",
+  "crates/clawstack-gateway",
+  "crates/clawstack-kernel",
+  "crates/clawstack-memory",
+  "crates/clawstack-policy",
+  "crates/clawstack-scheduler",
+  "crates/clawstack-toolbus",
+  "crates/clawstack-channels",
+  "crates/clawstack-code-runtime",
+  "crates/clawstack-mcp",
+  "crates/clawstack-api",
+  "crates/clawstack-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["ClawStack <dev@clawstack.dev>"]
+license = "MIT OR Apache-2.0"
+rust-version = "1.92"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full", "sync", "rt-multi-thread", "macros", "time"] }
+
+# Web
+axum = "0.8"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+hyper = "1.5"
+hyper-util = "0.1"
+tonic = "0.12"
+prost = "0.13"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+prost-types = "0.13"
+bytes = "1"
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "rust_decimal"] }
+pgvector = "0.3"
+
+# Auth / secrets
+argon2 = "0.5"
+jsonwebtoken = "9"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+opentelemetry = "0.26"
+opentelemetry-otlp = "0.26"
+
+# Utils
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "2"
+anyhow = "1"
+async-trait = "0.1"
+url = "2"
+reqwest = { version = "0.12", features = ["json"] }
+
+# Docker / WASM
+bollard = "0.18"
+wasmtime = "26"
+wasmi = "0.37"
+
+# Validation
+jsonschema = "0.29"
+pest = "2"
+validator = { version = "0.19", features = ["derive"] }
+
+# Security
+rustls = "0.23"
+webpki-roots = "0.26"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+
+[profile.dev]
+opt-level = 0
+debug = 1
+
+[patch.crates-io]

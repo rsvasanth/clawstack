@@ -1,0 +1,23 @@
+[package]
+name = "clawstack-memory"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+description = "ClawStack memory subsystem — Postgres + pgvector"
+
+[dependencies]
+clawstack-common = { path = "../clawstack-common" }
+tokio = { workspace = true }
+sqlx = { workspace = true }
+pgvector = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }

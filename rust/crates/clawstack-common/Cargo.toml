@@ -1,0 +1,34 @@
+[package]
+name = "clawstack-common"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+description = "Shared types, errors, and utilities for ClawStack"
+
+[dependencies]
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Async
+async-trait = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# IDs
+uuid = { workspace = true }
+
+# Validation
+jsonschema = { workspace = true }
+validator = { workspace = true }
+
+# Web
+url = { workspace = true }
