@@ -10,7 +10,7 @@ use clawstack_common::{
 };
 use clawstack_kernel::{
     context::ExecutionContext,
-    loop_::{ToolBus, ToolSpec as KernelToolSpec},
+    loop_::ToolBus,
 };
 use futures::future::join_all;
 use std::collections::HashMap;
@@ -50,30 +50,15 @@ impl ToolBusImpl {
     }
 
     /// Get a tool's specification.
-    fn get_spec_internal(tool_id: &str) -> Option<KernelToolSpec> {
-        match tool_id {
-            "echo" => Some(KernelToolSpec {
-                id: "echo".to_string(),
-                description: "Echoes back the input text. Useful for testing.".to_string(),
-                required_capabilities: vec![],
-            }),
-            "memory.read" => Some(KernelToolSpec {
-                id: "memory.read".to_string(),
-                description: "Reads from the memory system. Returns recent memories.".to_string(),
-                required_capabilities: vec![Capability::MemoryRead],
-            }),
-            "memory.write" => Some(KernelToolSpec {
-                id: "memory.write".to_string(),
-                description: "Writes to the memory system. Stores a memory entry.".to_string(),
-                required_capabilities: vec![Capability::MemoryWrite],
-            }),
-            "web.fetch" => Some(KernelToolSpec {
-                id: "web.fetch".to_string(),
-                description: "Fetches content from a URL. Returns the response body.".to_string(),
-                required_capabilities: vec![Capability::WebFetch],
-            }),
-            _ => None,
-        }
+    fn get_spec_internal(tool_id: &str) -> Option<ToolSpec> {
+        let built_in = match tool_id {
+            "echo" => BuiltInTool::Echo,
+            "memory.read" => BuiltInTool::MemoryRead,
+            "memory.write" => BuiltInTool::MemoryWrite,
+            "web.fetch" => BuiltInTool::WebFetch,
+            _ => return None,
+        };
+        Some(built_in.spec())
     }
 }
 
@@ -141,7 +126,7 @@ impl ToolBus for ToolBusImpl {
         join_all(futures).await.into_iter().collect()
     }
 
-    fn get_spec(&self, tool_id: &str) -> Option<KernelToolSpec> {
+    fn get_spec(&self, tool_id: &str) -> Option<ToolSpec> {
         Self::get_spec_internal(tool_id)
     }
 }

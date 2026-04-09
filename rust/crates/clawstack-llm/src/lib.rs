@@ -116,7 +116,7 @@ impl LlmClient for OpenAiLlmClient {
                         "function": {
                             "name": t.id,
                             "description": t.description,
-                            "parameters": t.required_capabilities, // TODO: Use proper JSON schema
+                            "parameters": t.input_schema,
                         }
                     })
                 })

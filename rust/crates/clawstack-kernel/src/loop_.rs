@@ -64,7 +64,7 @@ pub trait ToolBus: Send + Sync {
     }
 
     /// Get the specification for a tool, including its required capabilities.
-    fn get_spec(&self, tool_id: &str) -> Option<crate::ToolSpec>;
+    fn get_spec(&self, tool_id: &str) -> Option<clawstack_common::ToolSpec>;
 }
 
 #[async_trait::async_trait]

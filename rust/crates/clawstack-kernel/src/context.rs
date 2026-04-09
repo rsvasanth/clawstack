@@ -1,9 +1,8 @@
 //! Execution context — assembled for every request.
 
 use clawstack_common::{
-    AgentRequest, Capability, MemoryEntry, ToolCall, ToolResult, WorkspacePolicy,
+    AgentRequest, MemoryEntry, ToolSpec, WorkspacePolicy,
 };
-use serde::{Deserialize, Serialize};
 
 /// Context assembled during kernel execution.
 #[derive(Debug, Clone)]
@@ -14,15 +13,7 @@ pub struct ExecutionContext {
     /// Active workspace policy.
     pub policy: WorkspacePolicy,
     /// Available tools.
-    pub tools: Vec<crate::ToolSpec>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolSpec {
-    pub id: String,
-    pub description: String,
-    /// Capabilities required to execute this tool.
-    pub required_capabilities: Vec<Capability>,
+    pub tools: Vec<ToolSpec>,
 }
 
 impl ExecutionContext {
@@ -39,7 +30,7 @@ impl ExecutionContext {
         }
     }
 
-    pub fn with_tools(mut self, tools: Vec<crate::ToolSpec>) -> Self {
+    pub fn with_tools(mut self, tools: Vec<ToolSpec>) -> Self {
         self.tools = tools;
         self
     }

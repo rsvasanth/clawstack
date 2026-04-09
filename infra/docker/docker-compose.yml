@@ -52,6 +52,7 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://clawstack:clawstack_dev@postgres:5432/clawstack
+      RUST_GATEWAY_URL: http://clawstack-gateway:8080
     depends_on:
       postgres:
         condition: service_healthy
