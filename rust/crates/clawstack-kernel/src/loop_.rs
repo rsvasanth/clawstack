@@ -62,6 +62,9 @@ pub trait ToolBus: Send + Sync {
         }
         Ok(results)
     }
+
+    /// Get the specification for a tool, including its required capabilities.
+    fn get_spec(&self, tool_id: &str) -> Option<crate::ToolSpec>;
 }
 
 #[async_trait::async_trait]
@@ -173,6 +176,30 @@ impl AgentKernel {
         let response = self.llm.complete(&ctx.request.text, ctx).await?;
 
         let tool_calls = response.tool_calls;
+
+        // === CAPABILITY ENFORCEMENT ===
+        // Check that the user has required capabilities before executing any tool
+        for call in &tool_calls {
+            let Some(spec) = self.toolbus.get_spec(&call.tool_id) else {
+                return Err(ClawstackError::not_found("tool", &call.tool_id));
+            };
+
+            for required_cap in &spec.required_capabilities {
+                let granted = self.policy.check_capability(
+                    ctx.request.workspace_id,
+                    ctx.request.user_id,
+                    *required_cap,
+                ).await?;
+
+                if !granted {
+                    return Err(ClawstackError::capability_denied(
+                        required_cap.as_str(),
+                        "user lacks required capability",
+                    ));
+                }
+            }
+        }
+
         let tool_results = self.toolbus.execute_many(tool_calls.clone(), ctx).await?;
 
         // Synthesize final response from tool results
@@ -217,15 +244,66 @@ impl AgentKernel {
         })
     }
 
-    async fn store_trajectory(&self, ctx: &ExecutionContext, _resp: &AgentResponse) -> Result<(), ClawstackError> {
+    async fn store_trajectory(&self, ctx: &ExecutionContext, resp: &AgentResponse) -> Result<(), ClawstackError> {
+        use clawstack_common::{MessageRole, TrajectoryToolCall, TrajectoryTurn};
+
+        let mut turns = Vec::new();
+        let start_time = chrono::Utc::now();
+
+        // Turn 0: User message
+        turns.push(TrajectoryTurn {
+            turn_index: 0,
+            role: MessageRole::User,
+            content: ctx.request.text.clone(),
+            tool_calls: vec![],
+        });
+
+        // Subsequent turns: LLM response + tool calls/results
+        let mut turn_index = 1;
+        for (call, result) in resp.tool_calls.iter().zip(resp.tool_results.iter()) {
+            // LLM generated this tool call
+            turns.push(TrajectoryTurn {
+                turn_index,
+                role: MessageRole::Assistant,
+                content: format!("Called tool: {}", call.tool_id),
+                tool_calls: vec![],
+            });
+            turn_index += 1;
+
+            // Tool execution result
+            let tool_call = TrajectoryToolCall {
+                tool_id: call.tool_id.clone(),
+                parameters: call.parameters.clone(),
+                output: result.output.as_ref().map(|o| o.to_string()),
+                success: result.success,
+                duration_ms: result.duration_ms,
+            };
+            turns.push(TrajectoryTurn {
+                turn_index,
+                role: MessageRole::Tool,
+                content: result.output.as_ref().map(|o| o.to_string()).unwrap_or_default(),
+                tool_calls: vec![tool_call],
+            });
+            turn_index += 1;
+        }
+
+        // If no tools were called, just have the user turn
+        let outcome = if resp.tool_calls.is_empty() {
+            TrajectoryOutcome::CompletedChat
+        } else {
+            TrajectoryOutcome::CompletedTools
+        };
+
+        let duration_ms = (chrono::Utc::now() - start_time).num_milliseconds() as u64;
+
         let trajectory = Trajectory {
             id: uuid::Uuid::new_v4(),
             workspace_id: ctx.request.workspace_id,
             session_id: ctx.request.session_id,
             user_message: ctx.request.text.clone(),
-            turns: vec![],
-            outcome: TrajectoryOutcome::CompletedChat,
-            duration_ms: 0,
+            turns,
+            outcome,
+            duration_ms,
             model: None,
             created_at: chrono::Utc::now(),
         };

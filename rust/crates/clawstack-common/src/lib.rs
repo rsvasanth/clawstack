@@ -1,6 +1,8 @@
 //! ClawStack common types — single source of truth for all crates.
 
+pub mod agent;
 pub mod capability;
+pub use agent::*;
 pub mod error;
 pub mod events;
 pub mod identity;

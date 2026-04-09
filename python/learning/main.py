@@ -20,7 +20,8 @@ evaluator: SkillEvaluator | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global collector, synthesizer, evaluator
-    db_url = "postgresql://localhost/clawstack"
+    import os
+    db_url = os.environ.get("DATABASE_URL", "postgresql://localhost/clawstack")
     collector = TrajectoryCollector(db_url)
     synthesizer = SkillSynthesizer(collector, "http://localhost:50051")
     evaluator = SkillEvaluator()

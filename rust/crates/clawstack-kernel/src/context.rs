@@ -1,7 +1,7 @@
 //! Execution context — assembled for every request.
 
 use clawstack_common::{
-    AgentRequest, CapabilityGrant, MemoryEntry, ToolCall, ToolResult, WorkspacePolicy,
+    AgentRequest, Capability, MemoryEntry, ToolCall, ToolResult, WorkspacePolicy,
 };
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +21,8 @@ pub struct ExecutionContext {
 pub struct ToolSpec {
     pub id: String,
     pub description: String,
-    pub required_capabilities: Vec<CapabilityGrant>,
+    /// Capabilities required to execute this tool.
+    pub required_capabilities: Vec<Capability>,
 }
 
 impl ExecutionContext {

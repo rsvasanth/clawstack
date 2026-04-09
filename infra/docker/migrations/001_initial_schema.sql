@@ -91,7 +91,7 @@ CREATE TABLE memory_embeddings (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_memory_embeddings_ ON memory_embeddings USING ivfflat (embedding vector_cosine_ops);
+CREATE INDEX idx_memory_embeddings_embedding ON memory_embeddings USING ivfflat (embedding vector_cosine_ops);
 CREATE INDEX idx_memories_tier ON memories(tier);
 CREATE INDEX idx_memories_workspace ON memories(workspace_id);
 
